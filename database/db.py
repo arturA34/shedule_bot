@@ -78,3 +78,16 @@ async def create_user(telegram_id: int, primary_group: str, subgroups: list[dict
         await conn.commit()
     finally:
         await conn.close()
+
+
+async def update_user(telegram_id: int, primary_group: str, subgroups: list[dict]) -> None:
+    conn = await get_connection()
+    try:
+        await conn.execute(
+            "UPDATE users SET primary_group = ?, subgroups = ? WHERE telegram_id = ?",
+            (primary_group, json.dumps(subgroups, ensure_ascii=False), telegram_id),
+        )
+        await conn.commit()
+    finally:
+        await conn.close()
+
