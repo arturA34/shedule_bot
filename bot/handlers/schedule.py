@@ -54,3 +54,28 @@ async def cmd_today(message: Message, state: FSMContext) -> None:
         return
 
     await message.answer("На сегодня занятий нет.")
+
+
+@schedule_router.message(Command("tomorrow"))
+@schedule_router.message(lambda m: m.text == "Расписание на завтра")
+async def cmd_tomorrow(message: Message, state: FSMContext) -> None:
+    tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+
+    try:
+        lessons = await get_user_schedule(message.from_user.id, tomorrow)
+    except UserNotRegisteredError:
+        await state.set_state(RegistrationStates.WaitingForGroup)
+        await message.answer(
+            "Вы не зарегистрированы. Пожалуйста, введите номер вашей учебной группы:"
+        )
+        return
+
+    if lessons:
+        await message.answer(format_schedule(lessons, _date_label(tomorrow)))
+        return
+
+    if not await has_schedule_data_for_date(tomorrow):
+        await message.answer("Расписание на эту дату ещё не загружено.")
+        return
+
+    await message.answer("На завтра занятий нет.")
