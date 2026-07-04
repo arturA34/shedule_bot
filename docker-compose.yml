@@ -6,8 +6,5 @@ services:
     env_file:
       - .env
     volumes:
-      - database:/app/database
+      - ./database:/app/database
       - ./bot.log:/app/bot.log
-
-volumes:
-  database:
