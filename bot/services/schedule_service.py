@@ -50,6 +50,20 @@ def _matches_subgroup(lesson_subject: str, lesson_subgroup: Optional[str], user_
     return user_sub_map.get(lesson_subject) == lesson_subgroup
 
 
+async def has_schedule_data_for_date(target_date: datetime.date) -> bool:
+    """Проверяет, есть ли вообще записи в schedule на указанную дату."""
+    conn = await _get_connection()
+    try:
+        cursor = await conn.execute(
+            "SELECT 1 FROM schedule WHERE date = ? LIMIT 1",
+            (target_date.isoformat(),),
+        )
+        row = await cursor.fetchone()
+        return row is not None
+    finally:
+        await conn.close()
+
+
 async def get_user_schedule(telegram_id: int, target_date: datetime.date) -> list[dict]:
     """Возвращает список занятий пользователя на указанную дату."""
     profile = await _get_user_profile(telegram_id)
