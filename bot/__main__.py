@@ -1,7 +1,6 @@
-from bot.config import get_settings, setup_logging
+import asyncio
 
-setup_logging()
+from bot.main import main
 
 if __name__ == "__main__":
-    settings = get_settings()
-    print(f"Config loaded. DB_PATH={settings.DB_PATH}")
+    asyncio.run(main())
