@@ -1,33 +1,32 @@
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 
-from bot.keyboards.reply import get_main_menu_keyboard
+from bot.keyboards.inline import get_back_keyboard
 
 help_router = Router(name="help")
 
 HELP_TEXT = (
-    "<b>Доступные команды:</b>\n\n"
-    "/start — Запуск бота\n"
-    "/menu — Главное меню\n"
-    "/today — Расписание на сегодня\n"
-    "/tomorrow — Расписание на завтра\n"
-    "/week — Расписание на неделю\n"
-    "/settings — Настройки группы и подгрупп\n"
-    "/help — Справка по командам\n\n"
-    "<b>Кнопки меню:</b>\n"
-    "• Расписание на сегодня / завтра\n"
-    "• Расписание на неделю\n"
-    "• Сменить группу\n"
-    "• Помощь"
+    "❓ <b>Справка по использованию бота</b>\n\n"
+    "<b>Доступные команды:</b>\n"
+    "• /start — Запустить бота\n"
+    "• /menu — Главное меню\n"
+    "• /today — Расписание на сегодня\n"
+    "• /tomorrow — Расписание на завтра\n"
+    "• /week — Расписание на неделю\n"
+    "• /settings — Настройки группы и подгрупп\n"
+    "• /help — Показать эту справку\n\n"
+    "Все эти функции также доступны с помощью интерактивных инлайн-кнопок прямо в меню бота!"
 )
 
 
 @help_router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
-    await message.answer(HELP_TEXT, reply_markup=get_main_menu_keyboard())
+    await message.answer(HELP_TEXT, reply_markup=get_back_keyboard())
 
 
-@help_router.message(lambda m: m.text == "Помощь")
-async def btn_help(message: Message) -> None:
-    await message.answer(HELP_TEXT, reply_markup=get_main_menu_keyboard())
+@help_router.callback_query(F.data == "menu:help")
+async def cb_help(callback: CallbackQuery) -> None:
+    await callback.message.edit_text(HELP_TEXT, reply_markup=get_back_keyboard())
+    await callback.answer()
+

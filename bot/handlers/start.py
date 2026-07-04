@@ -1,11 +1,11 @@
 import json
 
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 
-from bot.keyboards.reply import get_main_menu_keyboard
+from bot.keyboards.inline import get_main_menu_inline_keyboard, get_skip_subgroups_keyboard
 from bot.states.registration import RegistrationStates
 from database.db import get_user, create_user
 
@@ -18,41 +18,75 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
 
     if user:
         await message.answer(
-            f"С возвращением, {message.from_user.full_name}!\n"
-            f"Ваша группа: <b>{user['primary_group']}</b>",
-            reply_markup=get_main_menu_keyboard(),
+            f"С возвращением, {message.from_user.full_name}! 👋\n\n"
+            f"Ваша текущая группа: <b>{user['primary_group']}</b>\n"
+            "Выберите интересующий раздел в меню ниже:",
+            reply_markup=get_main_menu_inline_keyboard(),
         )
         return
 
     await state.set_state(RegistrationStates.WaitingForGroup)
-    await message.answer(
-        f"Привет, {message.from_user.full_name}!\n\n"
-        "Я бот расписания. Помогу узнать расписание занятий.\n\n"
+    sent_msg = await message.answer(
+        f"Привет, {message.from_user.full_name}! 🎓\n\n"
+        "Я бот расписания. Я помогу вам всегда быть в курсе учебного расписания.\n\n"
         "Пожалуйста, введите номер вашей учебной группы\n"
         "(например: <b>РИ-150943А</b>):"
     )
+    await state.update_data(last_msg_id=sent_msg.message_id)
 
 
 @start_router.message(RegistrationStates.WaitingForGroup)
 async def process_group(message: Message, state: FSMContext) -> None:
     group = message.text.strip()
     await state.update_data(primary_group=group)
+    
+    # Delete the user's input message to keep chat clean
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+    data = await state.get_data()
+    last_msg_id = data.get("last_msg_id")
+
     await state.set_state(RegistrationStates.WaitingForSubgroups)
-    await message.answer(
-        f"Группа: <b>{group}</b>\n\n"
-        "Теперь укажите подгруппы по предметам.\n"
-        "Введите через запятую в формате:\n"
+    text = (
+        f"Выбранная группа: <b>{group}</b>\n\n"
+        "Теперь укажите ваши подгруппы по предметам.\n"
+        "Введите их через запятую в формате:\n"
         "<code>Предмет: Подгруппа</code>\n\n"
         "Например: <code>Физика: ЛБ-04, Информатика: ЛБ-01</code>\n\n"
-        "Или напишите <b>Нет</b>, если подгрупп нет:"
+        "Или нажмите кнопку ниже, если у вас нет подгрупп:"
     )
+
+    if last_msg_id:
+        try:
+            await message.bot.edit_message_text(
+                chat_id=message.chat.id,
+                message_id=last_msg_id,
+                text=text,
+                reply_markup=get_skip_subgroups_keyboard(),
+            )
+            return
+        except Exception:
+            pass
+
+    sent_msg = await message.answer(text, reply_markup=get_skip_subgroups_keyboard())
+    await state.update_data(last_msg_id=sent_msg.message_id)
 
 
 @start_router.message(RegistrationStates.WaitingForSubgroups)
 async def process_subgroups(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     primary_group = data["primary_group"]
+    last_msg_id = data.get("last_msg_id")
     text = message.text.strip()
+
+    # Delete the user's input message to keep chat clean
+    try:
+        await message.delete()
+    except Exception:
+        pass
 
     subgroups = []
     if text.lower() != "нет":
@@ -71,11 +105,45 @@ async def process_subgroups(message: Message, state: FSMContext) -> None:
     subgroup_info = ""
     if subgroups:
         lines = [f"  • {s['subject']}: <b>{s['subgroup']}</b>" for s in subgroups]
-        subgroup_info = "\n\nПодгруппы:\n" + "\n".join(lines)
+        subgroup_info = "\n\nВаши подгруппы:\n" + "\n".join(lines)
+    else:
+        subgroup_info = "\n\nПодгруппы: не указаны."
 
-    await message.answer(
-        f"Регистрация завершена!\n\n"
+    success_text = (
+        f"Регистрация успешно завершена! 🎉\n\n"
         f"Группа: <b>{primary_group}</b>{subgroup_info}\n\n"
-        "Используйте кнопки меню для работы с ботом.",
-        reply_markup=get_main_menu_keyboard(),
+        "Используйте меню ниже для работы с ботом."
     )
+
+    if last_msg_id:
+        try:
+            await message.bot.edit_message_text(
+                chat_id=message.chat.id,
+                message_id=last_msg_id,
+                text=success_text,
+                reply_markup=get_main_menu_inline_keyboard(),
+            )
+            return
+        except Exception:
+            pass
+
+    await message.answer(success_text, reply_markup=get_main_menu_inline_keyboard())
+
+
+@start_router.callback_query(RegistrationStates.WaitingForSubgroups, F.data == "subgroups:skip")
+async def skip_subgroups_registration(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    primary_group = data["primary_group"]
+
+    await create_user(callback.from_user.id, primary_group, [])
+    await state.clear()
+
+    await callback.message.edit_text(
+        f"Регистрация успешно завершена! 🎉\n\n"
+        f"Группа: <b>{primary_group}</b>\n"
+        "Подгруппы: не указаны.\n\n"
+        "Используйте меню ниже для работы с ботом.",
+        reply_markup=get_main_menu_inline_keyboard(),
+    )
+    await callback.answer()
+
