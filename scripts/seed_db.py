@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from database.db import get_connection, init_db
 
-GROUPS = ["РИ-150943А", "РИ-150943Б"]
+GROUPS = ["РИ-150943", "РИ-150942"]
 
 SCHEDULE_TEMPLATE = [
     # Monday

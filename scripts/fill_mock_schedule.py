@@ -1,4 +1,4 @@
-"""Скрипт заполнения schedule моковыми данными для РИ-150943А на 3 недели."""
+"""Скрипт заполнения schedule моковыми данными для РИ-150943 на 3 недели."""
 
 import asyncio
 import datetime
@@ -10,7 +10,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from database.db import get_connection, close_db
 
-GROUP = "РИ-150943А"
+GROUP = "РИ-150943"
 
 WEEKDAYS_RU = {
     0: "Понедельник",

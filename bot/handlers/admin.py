@@ -141,7 +141,7 @@ async def cb_admin_group_sel(callback: CallbackQuery, callback_data: AdminGroupS
         await state.set_state(AdminGroupStates.WaitingForGroupName)
         sent_msg = await callback.message.edit_text(
             "<b>Создание новой группы</b> ➕\n\n"
-            "Пожалуйста, введите название новой группы (например, <b>РИ-150943В</b>):"
+            "Пожалуйста, введите название новой группы (например, <b>РИ-150943</b>):"
         )
         await state.update_data(last_msg_id=sent_msg.message_id)
     await callback.answer()

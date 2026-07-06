@@ -11,7 +11,7 @@ from bot.services.notification_service import (
     notify_users_about_changes,
 )
 
-GROUP = "РИ-150943А"
+GROUP = "РИ-150943"
 TARGET_DATE = "2026-07-06"  # Понедельник первой полной недели
 
 

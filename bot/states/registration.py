@@ -8,5 +8,9 @@ class RegistrationStates(StatesGroup):
 
 class ChangeGroupStates(StatesGroup):
     WaitingForGroup = State()
+
+
+class ChangeSubgroupsStates(StatesGroup):
     WaitingForSubgroups = State()
+
 

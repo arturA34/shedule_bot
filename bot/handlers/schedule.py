@@ -46,7 +46,7 @@ async def show_today_schedule(
         lessons = await get_user_schedule(user_id, today)
     except UserNotRegisteredError:
         await state.set_state(RegistrationStates.WaitingForGroup)
-        text = "Вы не зарегистрированы. Пожалуйста, введите номер вашей учебной группы (например: <b>РИ-150943А</b>):"
+        text = "Вы не зарегистрированы. Пожалуйста, введите номер вашей учебной группы (например: <b>РИ-150943</b>):"
         if message_to_edit:
             try:
                 await message_to_edit.edit_text(text)
@@ -110,7 +110,7 @@ async def show_tomorrow_schedule(
         lessons = await get_user_schedule(user_id, tomorrow)
     except UserNotRegisteredError:
         await state.set_state(RegistrationStates.WaitingForGroup)
-        text = "Вы не зарегистрированы. Пожалуйста, введите номер вашей учебной группы (например: <b>РИ-150943А</b>):"
+        text = "Вы не зарегистрированы. Пожалуйста, введите номер вашей учебной группы (например: <b>РИ-150943</b>):"
         if message_to_edit:
             try:
                 await message_to_edit.edit_text(text)
@@ -173,7 +173,7 @@ async def show_week_schedule(
         week_schedule = await get_user_schedule_range(user_id, monday, monday + datetime.timedelta(days=6))
     except UserNotRegisteredError:
         await state.set_state(RegistrationStates.WaitingForGroup)
-        text = "Вы не зарегистрированы. Пожалуйста, введите номер вашей учебной группы (например: <b>РИ-150943А</b>):"
+        text = "Вы не зарегистрированы. Пожалуйста, введите номер вашей учебной группы (например: <b>РИ-150943</b>):"
         if message_to_edit:
             try:
                 await message_to_edit.edit_text(text)
