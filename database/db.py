@@ -58,11 +58,38 @@ async def init_db() -> None:
                 subgroup_name TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS teachers (
+                id SERIAL PRIMARY KEY,
+                fio VARCHAR(255) NOT NULL,
+                department VARCHAR(255),
+                email VARCHAR(255)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_schedule_group_name
                 ON schedule(group_name);
             CREATE INDEX IF NOT EXISTS idx_schedule_date
                 ON schedule(date);
         """)
+        
+        # Check if teachers table is empty and seed if needed
+        count = await conn.fetchval("SELECT COUNT(*) FROM teachers")
+        if count == 0:
+            await conn.executemany(
+                """
+                INSERT INTO teachers (fio, department, email)
+                VALUES ($1, $2, $3)
+                """,
+                [
+                    ("Иванов И.И.", "Кафедра Высшей Математики", "ivanov.ii@university.edu"),
+                    ("Петров П.П.", "Кафедра Информационных Технологий", "petrov.pp@university.edu"),
+                    ("Сидоров С.С.", "Кафедра Общей Физики", "sidorov.ss@university.edu"),
+                    ("Козлова А.В.", "Кафедра Истории", "kozlova.av@university.edu"),
+                    ("Новикова Е.Д.", "Кафедра Философии", "novikova.ed@university.edu"),
+                    ("Смирнова О.Л.", "Кафедра Иностранных Языков", "smirnova.ol@university.edu"),
+                    ("Козлов В.Н.", "Кафедра Физического Воспитания", "kozlov.vn@university.edu"),
+                ]
+            )
+            logger.info("Teachers table seeded with default records.")
     logger.info("Database schema initialized.")
 
 
@@ -226,5 +253,61 @@ async def delete_lesson(lesson_id: int) -> None:
         "DELETE FROM schedule WHERE id = $1",
         lesson_id,
     )
+
+
+async def search_teachers(query: str) -> list[dict]:
+    pool = await get_pool()
+    rows = await pool.fetch(
+        "SELECT id, fio, department, email FROM teachers WHERE fio ILIKE $1 ORDER BY fio",
+        f"%{query}%",
+    )
+    return [dict(row) for row in rows]
+
+
+async def get_teacher_by_id(teacher_id: int) -> Optional[dict]:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, fio, department, email FROM teachers WHERE id = $1",
+        teacher_id,
+    )
+    return dict(row) if row else None
+
+
+async def get_lessons_by_teacher_and_date(teacher_fio: str, date_str: str) -> list[dict]:
+    pool = await get_pool()
+    rows = await pool.fetch(
+        """
+        SELECT id, day_of_week, date, lesson_number, start_time, end_time,
+               subject, teacher, room, building, lesson_type,
+               group_name, subgroup_name
+        FROM schedule
+        WHERE teacher = $1 AND date = $2
+        ORDER BY lesson_number
+        """,
+        teacher_fio,
+        date_str,
+    )
+    return [dict(row) for row in rows]
+
+
+async def get_lessons_by_teacher_and_date_range(
+    teacher_fio: str, start_date_str: str, end_date_str: str
+) -> list[dict]:
+    pool = await get_pool()
+    rows = await pool.fetch(
+        """
+        SELECT id, day_of_week, date, lesson_number, start_time, end_time,
+               subject, teacher, room, building, lesson_type,
+               group_name, subgroup_name
+        FROM schedule
+        WHERE teacher = $1 AND date BETWEEN $2 AND $3
+        ORDER BY date, lesson_number
+        """,
+        teacher_fio,
+        start_date_str,
+        end_date_str,
+    )
+    return [dict(row) for row in rows]
+
 
 
