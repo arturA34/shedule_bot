@@ -5,7 +5,7 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
-from bot.keyboards.inline import get_main_menu_inline_keyboard, get_skip_subgroups_keyboard
+from bot.keyboards import get_main_menu_keyboard, get_skip_subgroups_keyboard
 from bot.states.registration import RegistrationStates
 from database.db import get_user, create_user
 
@@ -21,7 +21,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
             f"С возвращением, {message.from_user.full_name}! 👋\n\n"
             f"Ваша текущая группа: <b>{user['primary_group']}</b>\n"
             "Выберите интересующий раздел в меню ниже:",
-            reply_markup=get_main_menu_inline_keyboard(),
+            reply_markup=get_main_menu_keyboard(),
         )
         return
 
@@ -61,13 +61,7 @@ async def process_group(message: Message, state: FSMContext) -> None:
 
     if last_msg_id:
         try:
-            await message.bot.edit_message_text(
-                chat_id=message.chat.id,
-                message_id=last_msg_id,
-                text=text,
-                reply_markup=get_skip_subgroups_keyboard(),
-            )
-            return
+            await message.bot.delete_message(chat_id=message.chat.id, message_id=last_msg_id)
         except Exception:
             pass
 
@@ -89,7 +83,7 @@ async def process_subgroups(message: Message, state: FSMContext) -> None:
         pass
 
     subgroups = []
-    if text.lower() != "нет":
+    if text.lower() not in ("нет", "⏭️ без подгрупп"):
         for item in text.split(","):
             item = item.strip()
             if ":" in item:
@@ -117,17 +111,11 @@ async def process_subgroups(message: Message, state: FSMContext) -> None:
 
     if last_msg_id:
         try:
-            await message.bot.edit_message_text(
-                chat_id=message.chat.id,
-                message_id=last_msg_id,
-                text=success_text,
-                reply_markup=get_main_menu_inline_keyboard(),
-            )
-            return
+            await message.bot.delete_message(chat_id=message.chat.id, message_id=last_msg_id)
         except Exception:
             pass
 
-    await message.answer(success_text, reply_markup=get_main_menu_inline_keyboard())
+    await message.answer(success_text, reply_markup=get_main_menu_keyboard())
 
 
 @start_router.callback_query(RegistrationStates.WaitingForSubgroups, F.data == "subgroups:skip")
@@ -138,12 +126,16 @@ async def skip_subgroups_registration(callback: CallbackQuery, state: FSMContext
     await create_user(callback.from_user.id, primary_group, [])
     await state.clear()
 
-    await callback.message.edit_text(
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.message.answer(
         f"Регистрация успешно завершена! 🎉\n\n"
         f"Группа: <b>{primary_group}</b>\n"
         "Подгруппы: не указаны.\n\n"
         "Используйте меню ниже для работы с ботом.",
-        reply_markup=get_main_menu_inline_keyboard(),
+        reply_markup=get_main_menu_keyboard(),
     )
     await callback.answer()
-

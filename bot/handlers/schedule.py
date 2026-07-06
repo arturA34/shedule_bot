@@ -6,15 +6,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from bot.keyboards.inline import (
-    get_main_menu_inline_keyboard,
-    get_back_keyboard,
-    get_today_schedule_keyboard,
-    get_tomorrow_schedule_keyboard,
-    get_today_holiday_keyboard,
-    get_tomorrow_holiday_keyboard,
-    get_week_navigation_keyboard,
-)
+from bot.keyboards import get_week_navigation_keyboard
 from bot.services.schedule_service import (
     UserNotRegisteredError,
     get_user_schedule,
@@ -70,7 +62,6 @@ async def show_today_schedule(
     if lessons:
         header = f"📅 Расписание на сегодня ({today.strftime('%d.%m.%Y')}):"
         text = format_lessons_student(lessons, header)
-        keyboard = get_today_schedule_keyboard()
     else:
         # Check if schedule data exists for today
         if not await has_schedule_data_for_date(today):
@@ -79,7 +70,6 @@ async def show_today_schedule(
                 f"⚠️ Расписание на этот период ещё не загружено.\n\n"
                 f"Пожалуйста, обратитесь к администратору или попробуйте позже."
             )
-            keyboard = get_back_keyboard()
         else:
             # Holiday today
             try:
@@ -93,19 +83,17 @@ async def show_today_schedule(
             text = (
                 f"📅 Расписание на сегодня ({today.strftime('%d.%m.%Y')}):\n\n"
                 f"😴 Пар нет. Можете отдохнуть или подготовиться к следующим занятиям.\n\n"
-                f"Завтра ({tomorrow_date_str}) у вас запланировано {lessons_word}.\n"
-                f"Хотите посмотреть?"
+                f"Завтра ({tomorrow_date_str}) у вас запланировано {lessons_word}."
             )
-            keyboard = get_today_holiday_keyboard()
 
     if message_to_edit:
         try:
-            await message_to_edit.edit_text(text, reply_markup=keyboard)
+            await message_to_edit.edit_text(text, reply_markup=None)
             return
         except Exception:
             pass
 
-    await (message_to_reply or message_to_edit).answer(text, reply_markup=keyboard)
+    await (message_to_reply or message_to_edit).answer(text, reply_markup=None)
 
 
 async def show_tomorrow_schedule(
@@ -138,7 +126,6 @@ async def show_tomorrow_schedule(
     if lessons:
         header = f"📅 Расписание на завтра ({tomorrow.strftime('%d.%m.%Y')}):"
         text = format_lessons_student(lessons, header)
-        keyboard = get_tomorrow_schedule_keyboard()
     else:
         # Check if schedule data exists for tomorrow
         if not await has_schedule_data_for_date(tomorrow):
@@ -147,7 +134,6 @@ async def show_tomorrow_schedule(
                 f"⚠️ Расписание на этот период ещё не загружено.\n\n"
                 f"Пожалуйста, обратитесь к администратору или попробуйте позже."
             )
-            keyboard = get_back_keyboard()
         else:
             # Holiday tomorrow
             try:
@@ -163,16 +149,15 @@ async def show_tomorrow_schedule(
                 f"😴 Завтра пар нет. Хорошего выходного!\n\n"
                 f"Сегодня ({today_date_str}) у вас было {lessons_word}."
             )
-            keyboard = get_tomorrow_holiday_keyboard()
 
     if message_to_edit:
         try:
-            await message_to_edit.edit_text(text, reply_markup=keyboard)
+            await message_to_edit.edit_text(text, reply_markup=None)
             return
         except Exception:
             pass
 
-    await (message_to_reply or message_to_edit).answer(text, reply_markup=keyboard)
+    await (message_to_reply or message_to_edit).answer(text, reply_markup=None)
 
 
 async def show_week_schedule(
@@ -236,6 +221,7 @@ async def show_week_schedule(
 
 
 @schedule_router.message(Command("today"))
+@schedule_router.message(F.text == "📅 Расписание на сегодня")
 async def cmd_today(message: Message, state: FSMContext) -> None:
     await show_today_schedule(
         chat_id=message.chat.id,
@@ -246,6 +232,7 @@ async def cmd_today(message: Message, state: FSMContext) -> None:
 
 
 @schedule_router.message(Command("tomorrow"))
+@schedule_router.message(F.text == "📆 Расписание на завтра")
 async def cmd_tomorrow(message: Message, state: FSMContext) -> None:
     await show_tomorrow_schedule(
         chat_id=message.chat.id,
@@ -256,6 +243,7 @@ async def cmd_tomorrow(message: Message, state: FSMContext) -> None:
 
 
 @schedule_router.message(Command("week"))
+@schedule_router.message(F.text == "📋 Расписание на неделю")
 async def cmd_week(message: Message, state: FSMContext) -> None:
     today = datetime.date.today()
     monday = today - datetime.timedelta(days=today.weekday())

@@ -3,7 +3,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
-from bot.keyboards.inline import get_main_menu_inline_keyboard, get_skip_subgroups_keyboard
+from bot.keyboards import get_main_menu_keyboard, get_skip_subgroups_keyboard
 from bot.states.registration import ChangeGroupStates
 from database.db import update_user
 
@@ -25,9 +25,7 @@ async def start_change_group_flow(
     )
     if message_to_edit:
         try:
-            await message_to_edit.edit_text(text)
-            await state.update_data(last_msg_id=message_to_edit.message_id)
-            return
+            await message_to_edit.delete()
         except Exception:
             pass
 
@@ -37,6 +35,7 @@ async def start_change_group_flow(
 
 @change_group_router.message(Command("settings"))
 @change_group_router.message(Command("change_group"))
+@change_group_router.message(F.text == "⚙️ Управление подгруппами")
 async def cmd_change_group(message: Message, state: FSMContext) -> None:
     await start_change_group_flow(
         chat_id=message.chat.id,
@@ -83,13 +82,7 @@ async def process_change_group(message: Message, state: FSMContext) -> None:
 
     if last_msg_id:
         try:
-            await message.bot.edit_message_text(
-                chat_id=message.chat.id,
-                message_id=last_msg_id,
-                text=text,
-                reply_markup=get_skip_subgroups_keyboard(),
-            )
-            return
+            await message.bot.delete_message(chat_id=message.chat.id, message_id=last_msg_id)
         except Exception:
             pass
 
@@ -111,7 +104,7 @@ async def process_change_subgroups(message: Message, state: FSMContext) -> None:
         pass
 
     subgroups = []
-    if text.lower() != "нет":
+    if text.lower() not in ("нет", "⏭️ без подгрупп"):
         for item in text.split(","):
             item = item.strip()
             if ":" in item:
@@ -139,17 +132,11 @@ async def process_change_subgroups(message: Message, state: FSMContext) -> None:
 
     if last_msg_id:
         try:
-            await message.bot.edit_message_text(
-                chat_id=message.chat.id,
-                message_id=last_msg_id,
-                text=success_text,
-                reply_markup=get_main_menu_inline_keyboard(),
-            )
-            return
+            await message.bot.delete_message(chat_id=message.chat.id, message_id=last_msg_id)
         except Exception:
             pass
 
-    await message.answer(success_text, reply_markup=get_main_menu_inline_keyboard())
+    await message.answer(success_text, reply_markup=get_main_menu_keyboard())
 
 
 @change_group_router.callback_query(ChangeGroupStates.WaitingForSubgroups, F.data == "subgroups:skip")
@@ -160,12 +147,16 @@ async def skip_subgroups_change(callback: CallbackQuery, state: FSMContext) -> N
     await update_user(callback.from_user.id, primary_group, [])
     await state.clear()
 
-    await callback.message.edit_text(
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.message.answer(
         f"Данные успешно обновлены! ⚙️\n\n"
         f"Группа: <b>{primary_group}</b>\n"
         "Подгруппы: не указаны.\n\n"
         "Используйте меню ниже для работы с ботом.",
-        reply_markup=get_main_menu_inline_keyboard(),
+        reply_markup=get_main_menu_keyboard(),
     )
     await callback.answer()
-

@@ -2,8 +2,6 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 
-from bot.keyboards.inline import get_back_keyboard
-
 help_router = Router(name="help")
 
 HELP_TEXT = (
@@ -16,17 +14,21 @@ HELP_TEXT = (
     "• /week — Расписание на неделю\n"
     "• /settings — Настройки группы и подгрупп\n"
     "• /help — Показать эту справку\n\n"
-    "Все эти функции также доступны с помощью интерактивных инлайн-кнопок прямо в меню бота!"
+    "Все эти функции также доступны с помощью меню внизу экрана!"
 )
 
 
 @help_router.message(Command("help"))
+@help_router.message(F.text == "❓ Помощь")
 async def cmd_help(message: Message) -> None:
-    await message.answer(HELP_TEXT, reply_markup=get_back_keyboard())
+    await message.answer(HELP_TEXT)
 
 
 @help_router.callback_query(F.data == "menu:help")
 async def cb_help(callback: CallbackQuery) -> None:
-    await callback.message.edit_text(HELP_TEXT, reply_markup=get_back_keyboard())
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await callback.message.answer(HELP_TEXT)
     await callback.answer()
-
