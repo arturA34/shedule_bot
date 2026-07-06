@@ -15,12 +15,29 @@ logger = logging.getLogger(__name__)
 
 async def on_startup(bot: Bot) -> None:
     logger.info("Initializing database...")
-    await init_db()
+    max_retries = 5
+    retry_delay = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            await init_db()
+            logger.info("Database initialized successfully.")
+            break
+        except Exception as e:
+            logger.warning(
+                f"Database initialization failed (attempt {attempt}/{max_retries}): {e}. "
+                f"Retrying in {retry_delay} seconds..."
+            )
+            if attempt == max_retries:
+                logger.error("Could not connect to the database. Exiting...")
+                raise e
+            await asyncio.sleep(retry_delay)
     logger.info("Bot started")
 
 
 async def on_shutdown(bot: Bot) -> None:
     logger.info("Shutting down...")
+    from database.db import close_db
+    await close_db()
     await bot.session.close()
     logger.info("Bot stopped")
 

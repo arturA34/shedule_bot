@@ -1,5 +1,10 @@
 import asyncio
+import sys
 from datetime import date, timedelta
+from pathlib import Path
+
+# Добавляем корневую директорию проекта в sys.path, чтобы импортировать модули bot и database
+sys.path.append(str(Path(__file__).parent.parent))
 
 from database.db import get_connection, init_db
 
@@ -55,7 +60,6 @@ async def seed() -> None:
     conn = await get_connection()
     try:
         await conn.execute("DELETE FROM schedule")
-        await conn.commit()
 
         today = date.today()
         monday = today - timedelta(days=today.weekday())
@@ -87,17 +91,15 @@ async def seed() -> None:
                 (day_of_week, date, lesson_number, start_time, end_time,
                  subject, teacher, room, building, lesson_type,
                  group_name, subgroup_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             """,
             rows,
         )
-        await conn.commit()
         print(f"Inserted {len(rows)} rows for groups: {', '.join(GROUPS)}")
 
-        cursor = await conn.execute(
+        summary = await conn.fetch(
             "SELECT group_name, date, COUNT(*) as cnt FROM schedule GROUP BY group_name, date ORDER BY group_name, date"
         )
-        summary = await cursor.fetchall()
         print("\nSummary:")
         print(f"{'Group':<16} {'Date':<12} {'Lessons'}")
         print("-" * 36)
@@ -105,6 +107,8 @@ async def seed() -> None:
             print(f"{row[0]:<16} {row[1]:<12} {row[2]}")
     finally:
         await conn.close()
+        from database.db import close_db
+        await close_db()
 
 
 if __name__ == "__main__":

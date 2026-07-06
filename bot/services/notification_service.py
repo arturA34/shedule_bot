@@ -2,12 +2,12 @@ import datetime
 import json
 from typing import Any, Optional
 
-import aiosqlite
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from bot.config import get_settings
+from database.db import get_pool
 
 
 def detect_schedule_changes(old_lessons: list[dict[str, Any]], new_lessons: list[dict[str, Any]]) -> dict[str, list]:
@@ -56,19 +56,24 @@ def detect_schedule_changes(old_lessons: list[dict[str, Any]], new_lessons: list
 
 async def get_all_users() -> list[dict[str, Any]]:
     """Возвращает всех зарегистрированных пользователей из БД."""
-    settings = get_settings()
-    async with aiosqlite.connect(settings.DB_PATH) as conn:
-        conn.row_factory = aiosqlite.Row
-        cursor = await conn.execute("SELECT telegram_id, primary_group, subgroups FROM users")
-        rows = await cursor.fetchall()
-        users = []
-        for row in rows:
-            users.append({
-                "telegram_id": row["telegram_id"],
-                "primary_group": row["primary_group"],
-                "subgroups": json.loads(row["subgroups"]) if row["subgroups"] else [],
-            })
-        return users
+    pool = await get_pool()
+    rows = await pool.fetch("SELECT telegram_id, primary_group, subgroups FROM users")
+    users = []
+    for row in rows:
+        subgroups_val = row["subgroups"]
+        if isinstance(subgroups_val, str):
+            subgroups = json.loads(subgroups_val)
+        elif subgroups_val is None:
+            subgroups = []
+        else:
+            subgroups = subgroups_val
+
+        users.append({
+            "telegram_id": row["telegram_id"],
+            "primary_group": row["primary_group"],
+            "subgroups": subgroups,
+        })
+    return users
 
 
 def get_user_changes(user: dict[str, Any], changes: dict[str, list]) -> dict[str, list]:
@@ -85,6 +90,8 @@ def get_user_changes(user: dict[str, Any], changes: dict[str, list]) -> dict[str
             return True
         subject = lesson["subject"]
         user_sub_map = {s["subject"]: s["subgroup"] for s in user_subgroups}
+        if subject not in user_sub_map:
+            return True
         return user_sub_map.get(subject) == subgrp
 
     user_added = [l for l in changes["added"] if matches_user(l)]

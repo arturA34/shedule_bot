@@ -2,10 +2,14 @@
 
 import asyncio
 import datetime
+import sys
+from pathlib import Path
 
-import aiosqlite
+# Добавляем корневую директорию проекта в sys.path, чтобы импортировать модули bot и database
+sys.path.append(str(Path(__file__).parent.parent))
 
-DB_PATH = "database/schedule.db"
+from database.db import get_connection, close_db
+
 GROUP = "РИ-150943А"
 
 WEEKDAYS_RU = {
@@ -86,15 +90,16 @@ async def main() -> None:
                 subgrp,
             ))
 
-    async with aiosqlite.connect(DB_PATH) as conn:
+    conn = await get_connection()
+    try:
         # Сначала очистим старое расписание для этой группы на указанный период
         end_date = start + datetime.timedelta(days=days - 1)
         await conn.execute(
             """
             DELETE FROM schedule
-            WHERE group_name = ? AND date >= ? AND date <= ?
+            WHERE group_name = $1 AND date >= $2 AND date <= $3
             """,
-            (GROUP, start.isoformat(), end_date.isoformat()),
+            GROUP, start.isoformat(), end_date.isoformat(),
         )
         
         await conn.executemany(
@@ -103,12 +108,14 @@ async def main() -> None:
                 (day_of_week, date, lesson_number, start_time, end_time,
                  subject, teacher, room, building, lesson_type,
                  group_name, subgroup_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             """,
             rows,
         )
-        await conn.commit()
         print(f"Вставлено {len(rows)} записей для группы {GROUP}")
+    finally:
+        await conn.close()
+        await close_db()
 
 
 if __name__ == "__main__":

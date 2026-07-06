@@ -1,30 +1,49 @@
 import json
+import logging
 from typing import Optional
 
-import aiosqlite
+import asyncpg
 
 from bot.config import get_settings
 
+logger = logging.getLogger(__name__)
 
-async def get_connection() -> aiosqlite.Connection:
+_pool: Optional[asyncpg.Pool] = None
+
+
+async def get_pool() -> asyncpg.Pool:
+    global _pool
+    if _pool is None:
+        settings = get_settings()
+        _pool = await asyncpg.create_pool(dsn=settings.db_dsn)
+    return _pool
+
+
+async def close_db() -> None:
+    global _pool
+    if _pool is not None:
+        await _pool.close()
+        _pool = None
+        logger.info("Database connection pool closed.")
+
+
+async def get_connection() -> asyncpg.Connection:
     settings = get_settings()
-    conn = await aiosqlite.connect(settings.DB_PATH)
-    conn.row_factory = aiosqlite.Row
-    return conn
+    return await asyncpg.connect(settings.db_dsn)
 
 
 async def init_db() -> None:
-    conn = await get_connection()
-    try:
-        await conn.executescript("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                telegram_id INTEGER PRIMARY KEY,
+                telegram_id BIGINT PRIMARY KEY,
                 primary_group TEXT NOT NULL,
-                subgroups TEXT
+                subgroups JSONB
             );
 
             CREATE TABLE IF NOT EXISTS schedule (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 day_of_week TEXT,
                 date TEXT,
                 lesson_number INTEGER,
@@ -44,99 +63,95 @@ async def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_schedule_date
                 ON schedule(date);
         """)
-        await conn.commit()
-    finally:
-        await conn.close()
+    logger.info("Database schema initialized.")
 
 
 async def get_user(telegram_id: int) -> Optional[dict]:
-    conn = await get_connection()
-    try:
-        cursor = await conn.execute(
-            "SELECT telegram_id, primary_group, subgroups FROM users WHERE telegram_id = ?",
-            (telegram_id,),
-        )
-        row = await cursor.fetchone()
-        if row is None:
-            return None
-        return {
-            "telegram_id": row["telegram_id"],
-            "primary_group": row["primary_group"],
-            "subgroups": json.loads(row["subgroups"]) if row["subgroups"] else [],
-        }
-    finally:
-        await conn.close()
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT telegram_id, primary_group, subgroups FROM users WHERE telegram_id = $1",
+        telegram_id,
+    )
+    if row is None:
+        return None
+
+    subgroups_val = row["subgroups"]
+    if isinstance(subgroups_val, str):
+        subgroups = json.loads(subgroups_val)
+    elif subgroups_val is None:
+        subgroups = []
+    else:
+        subgroups = subgroups_val
+
+    return {
+        "telegram_id": row["telegram_id"],
+        "primary_group": row["primary_group"],
+        "subgroups": subgroups,
+    }
 
 
 async def create_user(telegram_id: int, primary_group: str, subgroups: list[dict]) -> None:
-    conn = await get_connection()
-    try:
-        await conn.execute(
-            "INSERT OR REPLACE INTO users (telegram_id, primary_group, subgroups) VALUES (?, ?, ?)",
-            (telegram_id, primary_group, json.dumps(subgroups, ensure_ascii=False)),
-        )
-        await conn.commit()
-    finally:
-        await conn.close()
+    pool = await get_pool()
+    subgroups_json = json.dumps(subgroups, ensure_ascii=False)
+    await pool.execute(
+        """
+        INSERT INTO users (telegram_id, primary_group, subgroups)
+        VALUES ($1, $2, $3::jsonb)
+        ON CONFLICT (telegram_id) DO UPDATE
+        SET primary_group = EXCLUDED.primary_group,
+            subgroups = EXCLUDED.subgroups
+        """,
+        telegram_id,
+        primary_group,
+        subgroups_json,
+    )
 
 
 async def update_user(telegram_id: int, primary_group: str, subgroups: list[dict]) -> None:
-    conn = await get_connection()
-    try:
-        await conn.execute(
-            "UPDATE users SET primary_group = ?, subgroups = ? WHERE telegram_id = ?",
-            (primary_group, json.dumps(subgroups, ensure_ascii=False), telegram_id),
-        )
-        await conn.commit()
-    finally:
-        await conn.close()
+    pool = await get_pool()
+    subgroups_json = json.dumps(subgroups, ensure_ascii=False)
+    await pool.execute(
+        "UPDATE users SET primary_group = $1, subgroups = $2::jsonb WHERE telegram_id = $3",
+        primary_group,
+        subgroups_json,
+        telegram_id,
+    )
 
 
 async def get_all_groups() -> list[str]:
-    conn = await get_connection()
-    try:
-        cursor = await conn.execute("SELECT DISTINCT group_name FROM schedule ORDER BY group_name")
-        rows = await cursor.fetchall()
-        return [row["group_name"] for row in rows]
-    finally:
-        await conn.close()
+    pool = await get_pool()
+    rows = await pool.fetch("SELECT DISTINCT group_name FROM schedule ORDER BY group_name")
+    return [row["group_name"] for row in rows]
 
 
 async def get_lessons_by_group_and_date(group_name: str, date_str: str) -> list[dict]:
-    conn = await get_connection()
-    try:
-        cursor = await conn.execute(
-            """
-            SELECT id, day_of_week, date, lesson_number, start_time, end_time,
-                   subject, teacher, room, building, lesson_type,
-                   group_name, subgroup_name
-            FROM schedule
-            WHERE group_name = ? AND date = ?
-            ORDER BY lesson_number
-            """,
-            (group_name, date_str),
-        )
-        rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
-    finally:
-        await conn.close()
+    pool = await get_pool()
+    rows = await pool.fetch(
+        """
+        SELECT id, day_of_week, date, lesson_number, start_time, end_time,
+               subject, teacher, room, building, lesson_type,
+               group_name, subgroup_name
+        FROM schedule
+        WHERE group_name = $1 AND date = $2
+        ORDER BY lesson_number
+        """,
+        group_name,
+        date_str,
+    )
+    return [dict(row) for row in rows]
 
 
 async def get_lesson_by_id(lesson_id: int) -> Optional[dict]:
-    conn = await get_connection()
-    try:
-        cursor = await conn.execute(
-            """
-            SELECT id, day_of_week, date, lesson_number, start_time, end_time,
-                   subject, teacher, room, building, lesson_type,
-                   group_name, subgroup_name FROM schedule WHERE id = ?
-            """,
-            (lesson_id,),
-        )
-        row = await cursor.fetchone()
-        return dict(row) if row else None
-    finally:
-        await conn.close()
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        """
+        SELECT id, day_of_week, date, lesson_number, start_time, end_time,
+               subject, teacher, room, building, lesson_type,
+               group_name, subgroup_name FROM schedule WHERE id = $1
+        """,
+        lesson_id,
+    )
+    return dict(row) if row else None
 
 
 async def create_lesson(
@@ -153,70 +168,63 @@ async def create_lesson(
     group_name: str,
     subgroup_name: Optional[str]
 ) -> None:
-    conn = await get_connection()
-    try:
-        await conn.execute(
-            """
-            INSERT INTO schedule
-                (day_of_week, date, lesson_number, start_time, end_time,
-                 subject, teacher, room, building, lesson_type,
-                 group_name, subgroup_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (day_of_week, date_str, lesson_number, start_time, end_time,
+    pool = await get_pool()
+    await pool.execute(
+        """
+        INSERT INTO schedule
+            (day_of_week, date, lesson_number, start_time, end_time,
              subject, teacher, room, building, lesson_type,
-             group_name, subgroup_name),
-        )
-        await conn.commit()
-    finally:
-        await conn.close()
+             group_name, subgroup_name)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        """,
+        day_of_week,
+        date_str,
+        lesson_number,
+        start_time,
+        end_time,
+        subject,
+        teacher,
+        room,
+        building,
+        lesson_type,
+        group_name,
+        subgroup_name,
+    )
 
 
 async def update_lesson_subject(lesson_id: int, subject: str) -> None:
-    conn = await get_connection()
-    try:
-        await conn.execute(
-            "UPDATE schedule SET subject = ? WHERE id = ?",
-            (subject, lesson_id),
-        )
-        await conn.commit()
-    finally:
-        await conn.close()
+    pool = await get_pool()
+    await pool.execute(
+        "UPDATE schedule SET subject = $1 WHERE id = $2",
+        subject,
+        lesson_id,
+    )
 
 
 async def update_lesson_room_building(lesson_id: int, room: str, building: str) -> None:
-    conn = await get_connection()
-    try:
-        await conn.execute(
-            "UPDATE schedule SET room = ?, building = ? WHERE id = ?",
-            (room, building, lesson_id),
-        )
-        await conn.commit()
-    finally:
-        await conn.close()
+    pool = await get_pool()
+    await pool.execute(
+        "UPDATE schedule SET room = $1, building = $2 WHERE id = $3",
+        room,
+        building,
+        lesson_id,
+    )
 
 
 async def update_lesson_teacher(lesson_id: int, teacher: str) -> None:
-    conn = await get_connection()
-    try:
-        await conn.execute(
-            "UPDATE schedule SET teacher = ? WHERE id = ?",
-            (teacher, lesson_id),
-        )
-        await conn.commit()
-    finally:
-        await conn.close()
+    pool = await get_pool()
+    await pool.execute(
+        "UPDATE schedule SET teacher = $1 WHERE id = $2",
+        teacher,
+        lesson_id,
+    )
 
 
 async def delete_lesson(lesson_id: int) -> None:
-    conn = await get_connection()
-    try:
-        await conn.execute(
-            "DELETE FROM schedule WHERE id = ?",
-            (lesson_id,),
-        )
-        await conn.commit()
-    finally:
-        await conn.close()
+    pool = await get_pool()
+    await pool.execute(
+        "DELETE FROM schedule WHERE id = $1",
+        lesson_id,
+    )
 
 

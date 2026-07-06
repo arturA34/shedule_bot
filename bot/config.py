@@ -9,10 +9,19 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     BOT_TOKEN: str
-    DB_PATH: str = "database/schedule.db"
+    POSTGRES_USER: str = "db_user"
+    POSTGRES_PASSWORD: str = "db_password"
+    POSTGRES_DB: str = "schedule_db"
+    POSTGRES_HOST: str = "db"
+    POSTGRES_PORT: int = 5432
+
+    @property
+    def db_dsn(self) -> str:
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
 
 def get_settings() -> Settings:
