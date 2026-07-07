@@ -10,7 +10,7 @@ router = Router(name="items")
 
 
 async def show_management_menu(message: Message):
-    """Показать главное меню управления подгруппами"""
+    """Показать главное меню управления предметами"""
     user_id = message.from_user.id
     
     main_group = await ItemService.get_user_main_group(user_id)
@@ -20,7 +20,7 @@ async def show_management_menu(message: Message):
     
     items = await ItemService.get_user_items(user_id)
     
-    text = f"🔧 Управление подгруппами\n\n"
+    text = f"🔧 Управление предметами\n\n"
     text += f"Основная группа: {main_group}\n\n"
     text += f"Все предметы ({len(items)}):\n"
     

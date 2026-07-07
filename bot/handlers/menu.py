@@ -32,9 +32,10 @@ async def cb_main_menu(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-@menu_router.message(F.text == "⚙️ Управление подгруппами")
+@menu_router.message(Command("settings"))
+@menu_router.message(F.text == "⚙️ Управление предметами")
 async def handle_items_button(message: Message) -> None:
-    """Обработчик кнопки управления подгруппами"""
+    """Обработчик кнопки управления предметами"""
     await show_management_menu(message)
 
 

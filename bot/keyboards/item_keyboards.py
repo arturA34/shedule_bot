@@ -2,7 +2,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 def get_items_main_menu() -> InlineKeyboardMarkup:
-    """Главное меню управления подгруппами"""
+    """Главное меню управления предметами"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [

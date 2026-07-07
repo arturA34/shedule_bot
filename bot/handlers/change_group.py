@@ -10,6 +10,7 @@ from bot.keyboards import (
     get_main_menu_keyboard,
     get_skip_subgroups_keyboard,
     get_done_subgroups_keyboard,
+    get_cancel_keyboard,
 )
 from bot.states.registration import ChangeGroupStates, ChangeSubgroupsStates
 from database.db import get_user, update_user
@@ -119,7 +120,9 @@ async def start_change_group_flow(
         except Exception:
             pass
 
-    sent_msg = await (message_to_reply or message_to_edit).answer(text)
+    sent_msg = await (message_to_reply or message_to_edit).answer(
+        text, reply_markup=get_cancel_keyboard()
+    )
     await state.update_data(last_msg_id=sent_msg.message_id)
 
 
@@ -134,17 +137,6 @@ async def cmd_change_group(message: Message, state: FSMContext) -> None:
     )
 
 
-@change_group_router.callback_query(F.data == "menu:settings")
-async def cb_change_group(callback: CallbackQuery, state: FSMContext) -> None:
-    await start_change_group_flow(
-        chat_id=callback.message.chat.id,
-        user_id=callback.from_user.id,
-        state=state,
-        message_to_edit=callback.message,
-    )
-    await callback.answer()
-
-
 @change_group_router.message(ChangeGroupStates.WaitingForGroup)
 async def process_change_group(message: Message, state: FSMContext) -> None:
     new_group = message.text.strip()
@@ -154,6 +146,24 @@ async def process_change_group(message: Message, state: FSMContext) -> None:
         await message.delete()
     except Exception:
         pass
+
+    if new_group == "❌ Отмена":
+        data = await state.get_data()
+        last_msg_id = data.get("last_msg_id")
+        await state.clear()
+
+        if last_msg_id:
+            try:
+                await message.bot.delete_message(chat_id=message.chat.id, message_id=last_msg_id)
+            except Exception:
+                pass
+
+        await message.answer(
+            "<b>Главное меню</b> 📱\n\n"
+            "Выберите интересующий раздел:",
+            reply_markup=get_main_menu_keyboard()
+        )
+        return
 
     # Retrieve current user to keep their subgroups
     user = await get_user(message.from_user.id)
@@ -186,7 +196,6 @@ async def process_change_group(message: Message, state: FSMContext) -> None:
     await message.answer(success_text, reply_markup=get_main_menu_keyboard())
 
 
-@change_group_router.message(Command("settings"))
 @change_group_router.message(F.text == "⚙️ Управление предметами")
 async def cmd_change_subgroups(message: Message, state: FSMContext) -> None:
     user = await get_user(message.from_user.id)

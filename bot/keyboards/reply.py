@@ -14,14 +14,11 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="👨‍🏫 Поиск по преподавателю"),
+                KeyboardButton(text="❓ Помощь"),
             ],
             [
                 KeyboardButton(text="🔄 Сменить группу"),
                 KeyboardButton(text="⚙️ Управление предметами"),
-            ],
-            [
-                KeyboardButton(text="⚙️ Управление подгруппами"),
-                KeyboardButton(text="❓ Помощь"),
             ],
         ],
         resize_keyboard=True,
@@ -53,8 +50,8 @@ def get_done_subgroups_keyboard() -> ReplyKeyboardMarkup:
 
 
 
-def get_teacher_search_cancel_keyboard() -> ReplyKeyboardMarkup:
-    """Возвращает Reply-клавиатуру для отмены поиска преподавателя."""
+def get_cancel_keyboard() -> ReplyKeyboardMarkup:
+    """Возвращает Reply-клавиатуру для отмены действия."""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -63,6 +60,11 @@ def get_teacher_search_cancel_keyboard() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
     )
+
+
+def get_teacher_search_cancel_keyboard() -> ReplyKeyboardMarkup:
+    """Возвращает Reply-клавиатуру для отмены поиска преподавателя."""
+    return get_cancel_keyboard()
 
 
 def get_teacher_search_retry_keyboard() -> ReplyKeyboardMarkup:

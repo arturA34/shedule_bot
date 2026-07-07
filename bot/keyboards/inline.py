@@ -18,10 +18,10 @@ def get_main_menu_inline_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="👨‍🏫 Поиск по преподавателю", callback_data="menu:teacher_search"),
-                InlineKeyboardButton(text="⚙️ Управление подгруппами", callback_data="menu:settings"),
+                InlineKeyboardButton(text="❓ Помощь", callback_data="menu:help"),
             ],
             [
-                InlineKeyboardButton(text="❓ Помощь", callback_data="menu:help"),
+                InlineKeyboardButton(text="⚙️ Управление предметами", callback_data="menu:settings"),
             ],
         ]
     )
@@ -119,10 +119,7 @@ def get_week_navigation_keyboard(
         left_callback = f"week:day:{prev_monday.isoformat()}:{day_index}"
         right_callback = f"week:day:{next_monday.isoformat()}:{day_index}"
         
-    row1 = [
-        InlineKeyboardButton(text="◀️", callback_data=left_callback)
-    ]
-    
+    row1 = []
     weekdays_short = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"]
     for idx, day_label in enumerate(weekdays_short):
         row1.append(
@@ -132,16 +129,19 @@ def get_week_navigation_keyboard(
             )
         )
         
-    row1.append(InlineKeyboardButton(text="▶️", callback_data=right_callback))
+    row2 = [
+        InlineKeyboardButton(text="◀️", callback_data=left_callback),
+        InlineKeyboardButton(text="▶️", callback_data=right_callback),
+    ]
     
-    row2 = []
+    row3 = []
     if day_index is not None:
-        row2.append(
+        row3.append(
             InlineKeyboardButton(text="📋 Вся неделя", callback_data=f"week:show:{monday.isoformat()}")
         )
-    row2.append(InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"))
+    row3.append(InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"))
     
-    return InlineKeyboardMarkup(inline_keyboard=[row1, row2])
+    return InlineKeyboardMarkup(inline_keyboard=[row1, row2, row3])
 
 
 def get_teacher_search_cancel_keyboard() -> InlineKeyboardMarkup:
@@ -223,10 +223,7 @@ def get_teacher_week_navigation_keyboard(
         left_callback = f"t_sch:week:day:{teacher_id}:{prev_monday.isoformat()}:{day_index}"
         right_callback = f"t_sch:week:day:{teacher_id}:{next_monday.isoformat()}:{day_index}"
         
-    row1 = [
-        InlineKeyboardButton(text="◀️", callback_data=left_callback)
-    ]
-    
+    row1 = []
     weekdays_short = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"]
     for idx, day_label in enumerate(weekdays_short):
         row1.append(
@@ -236,16 +233,19 @@ def get_teacher_week_navigation_keyboard(
             )
         )
         
-    row1.append(InlineKeyboardButton(text="▶️", callback_data=right_callback))
+    row2 = [
+        InlineKeyboardButton(text="◀️", callback_data=left_callback),
+        InlineKeyboardButton(text="▶️", callback_data=right_callback),
+    ]
     
-    row2 = []
+    row3 = []
     if day_index is not None:
-        row2.append(
+        row3.append(
             InlineKeyboardButton(text="📋 Вся неделя", callback_data=f"t_sch:week:show:{teacher_id}:{monday.isoformat()}")
         )
-    row2.append(InlineKeyboardButton(text="🔙 Назад", callback_data=f"t_sch:card:{teacher_id}"))
+    row3.append(InlineKeyboardButton(text="🔙 Назад", callback_data=f"t_sch:card:{teacher_id}"))
     
-    return InlineKeyboardMarkup(inline_keyboard=[row1, row2])
+    return InlineKeyboardMarkup(inline_keyboard=[row1, row2, row3])
 
 
 # --- Классы CallbackData для Админ-Панели ---
