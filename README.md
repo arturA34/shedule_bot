@@ -1,5 +1,5 @@
 ## Ссылка на доску (если не получается зайти, то тогда у доски лимит участников)
-https://boardmix.com/app/share/CAE.CIzEmAIgBSoWOGlPd2sxQloxQTJLaHBqX3ItSGRzUTAFQAE
+https://boardmix.com/app/share/CAE.CIzEmAIgASoQ8iOwk1BZ1A2Khpj_r-HdsTAGQAE/jMS273
 
 ## 📋 СЦЕНАРИЙ
 
