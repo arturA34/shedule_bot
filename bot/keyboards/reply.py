@@ -20,6 +20,7 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="⚙️ Управление предметами"),
             ],
             [
+                KeyboardButton(text="⚙️ Управление подгруппами"),
                 KeyboardButton(text="❓ Помощь"),
             ],
         ],
