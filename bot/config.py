@@ -1,5 +1,6 @@
 import logging
 import sys
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,7 +36,12 @@ def setup_logging() -> None:
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
 
-    file_handler = logging.FileHandler("bot.log", encoding="utf-8")
+    # Создаем папку logs если её нет
+    LOG_DIR = "logs"
+    os.makedirs(LOG_DIR, exist_ok=True)
+    
+    # Лог в папку logs/
+    file_handler = logging.FileHandler(os.path.join(LOG_DIR, "bot.log"), encoding="utf-8")
     file_handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()

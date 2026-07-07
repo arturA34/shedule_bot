@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
 from bot.keyboards.reply import get_main_menu_keyboard
+from bot.handlers.item_handlers import show_management_menu
 
 menu_router = Router(name="menu")
 
@@ -29,6 +30,12 @@ async def cb_main_menu(callback: CallbackQuery) -> None:
         reply_markup=get_main_menu_keyboard()
     )
     await callback.answer()
+
+
+@menu_router.message(F.text == "⚙️ Управление подгруппами")
+async def handle_items_button(message: Message) -> None:
+    """Обработчик кнопки управления подгруппами"""
+    await show_management_menu(message)
 
 
 @menu_router.message(F.text == "🔙 В главное меню")

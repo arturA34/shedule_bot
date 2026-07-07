@@ -7,6 +7,7 @@ from bot.handlers.admin import admin_router
 from bot.handlers.help import help_router
 from bot.handlers.change_group import change_group_router
 from bot.handlers.teacher_search import teacher_search_router
+from bot.handlers.item_handlers import router as items_router
 
 all_routers = [
     start_router,
@@ -16,6 +17,7 @@ all_routers = [
     help_router,
     change_group_router,
     teacher_search_router,
+    items_router,
 ]
 
 __all__ = ["all_routers"]
