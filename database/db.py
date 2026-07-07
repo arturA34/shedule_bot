@@ -70,6 +70,14 @@ async def init_db() -> None:
                 ON schedule(group_name);
             CREATE INDEX IF NOT EXISTS idx_schedule_date
                 ON schedule(date);
+            CREATE TABLE IF NOT EXISTS admin_invites (
+                token VARCHAR(255) PRIMARY KEY,
+                is_used BOOLEAN DEFAULT FALSE
+            );
+
+            CREATE TABLE IF NOT EXISTS admins (
+                telegram_id BIGINT PRIMARY KEY
+            );
         """)
         
         # Check if teachers table is empty and seed if needed
@@ -393,6 +401,46 @@ async def get_lessons_by_teacher_and_date_range(
         end_date_str,
     )
     return [dict(row) for row in rows]
+
+
+async def add_admin_invite(token: str) -> None:
+    pool = await get_pool()
+    await pool.execute(
+        "INSERT INTO admin_invites (token, is_used) VALUES ($1, FALSE)",
+        token,
+    )
+
+
+async def verify_and_claim_invite(token: str, telegram_id: int) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                "SELECT is_used FROM admin_invites WHERE token = $1",
+                token,
+            )
+            if row is None or row["is_used"]:
+                return False
+
+            await conn.execute(
+                "UPDATE admin_invites SET is_used = TRUE WHERE token = $1",
+                token,
+            )
+            await conn.execute(
+                "INSERT INTO admins (telegram_id) VALUES ($1) ON CONFLICT (telegram_id) DO NOTHING",
+                telegram_id,
+            )
+            return True
+
+
+async def is_admin(telegram_id: int) -> bool:
+    pool = await get_pool()
+    val = await pool.fetchval(
+        "SELECT EXISTS(SELECT 1 FROM admins WHERE telegram_id = $1)",
+        telegram_id,
+    )
+    return bool(val)
+
 
 
 

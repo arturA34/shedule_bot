@@ -1,20 +1,34 @@
 import json
 
 from aiogram import Router, F
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
 from bot.keyboards import get_main_menu_keyboard
 from bot.states.registration import RegistrationStates
-from database.db import get_user, create_user
+from database.db import get_user, create_user, verify_and_claim_invite
 from bot.handlers.change_group import parse_subgroup_input, update_subgroups_message
 
 start_router = Router(name="start")
 
 
 @start_router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext) -> None:
+async def cmd_start(message: Message, state: FSMContext, command: CommandObject) -> None:
+    args = command.args
+    if args and args.startswith("admin_"):
+        token = args.replace("admin_", "", 1)
+        success = await verify_and_claim_invite(token, message.from_user.id)
+        if success:
+            await message.answer(
+                "Вы успешно авторизованы как администратор. Теперь вам доступна команда /admin."
+            )
+            return
+        else:
+            await message.answer(
+                "❌ Ссылка для авторизации администратора недействительна или уже была использована."
+            )
+
     user = await get_user(message.from_user.id)
 
     if user:

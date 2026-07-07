@@ -30,8 +30,12 @@ from database.db import (
     delete_lesson,
 )
 from bot.services.notification_service import notify_users_about_changes
+from bot.middlewares.admin import AdminMiddleware
 
 admin_router = Router(name="admin")
+admin_router.message.middleware(AdminMiddleware())
+admin_router.callback_query.middleware(AdminMiddleware())
+
 
 WEEKDAY_LABELS = {
     0: "понедельник",

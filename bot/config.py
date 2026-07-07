@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     )
 
     BOT_TOKEN: str
+    BOT_USERNAME: str = ""
     POSTGRES_USER: str = "db_user"
     POSTGRES_PASSWORD: str = "db_password"
     POSTGRES_DB: str = "schedule_db"
