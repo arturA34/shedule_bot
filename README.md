@@ -1,3 +1,6 @@
+## Ссылка на доску
+https://boardmix.com/app/share/CAE.CIzEmAIgBSoWOGlPd2sxQloxQTJLaHBqX3ItSGRzUTAFQAE
+
 ## 📋 СЦЕНАРИЙ
 
 ---
