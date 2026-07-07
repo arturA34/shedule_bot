@@ -1,4 +1,4 @@
-## Ссылка на доску
+## Ссылка на доску (если не получается зайти, то тогда у доски лимит участников)
 https://boardmix.com/app/share/CAE.CIzEmAIgBSoWOGlPd2sxQloxQTJLaHBqX3ItSGRzUTAFQAE
 
 ## 📋 СЦЕНАРИЙ
