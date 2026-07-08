@@ -1,9 +1,11 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile
 from aiogram.fsm.context import FSMContext
+import datetime
 from bot.keyboards.reply import get_main_menu_keyboard
 from bot.states.item_states import ItemStates
 from bot.keyboards.item_keyboards import *
+from bot.services.export_service import build_safe_filename, build_subjects_xlsx
 from bot.services.item_service import ItemService
 
 router = Router(name="items")
@@ -50,13 +52,36 @@ async def show_all_subjects(callback: CallbackQuery):
     
     subjects = await ItemService.get_all_subjects()
     text = f"📋 Список всех предметов в расписании ({len(subjects)}):\n\n"
-    for i, subject in enumerate(subjects, 1):
-        text += f"{i}. {subject}\n"
+    if subjects:
+        for i, subject in enumerate(subjects, 1):
+            text += f"{i}. {subject}\n"
+        keyboard = get_all_items_keyboard()
+    else:
+        text += "📭 В расписании пока нет предметов.\n"
+        keyboard = get_back_keyboard()
     
     try:
-        await callback.message.edit_text(text, reply_markup=get_all_items_keyboard())
+        await callback.message.edit_text(text, reply_markup=keyboard)
     except Exception:
-        await callback.message.edit_reply_markup(reply_markup=get_all_items_keyboard())
+        await callback.message.edit_reply_markup(reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "item_export_all")
+async def export_all_subjects(callback: CallbackQuery):
+    subjects = await ItemService.get_all_subjects()
+    if not subjects:
+        await callback.answer("Для экспорта нет предметов.", show_alert=True)
+        return
+
+    document = BufferedInputFile(
+        build_subjects_xlsx(subjects, sheet_title="Предметы"),
+        filename=build_safe_filename(
+            f"Список_всех_предметов_{datetime.date.today().strftime('%d.%m.%Y')}",
+            "xlsx",
+        ),
+    )
+    await callback.message.answer_document(document, caption="Экспорт списка предметов (Excel)")
+    await callback.answer("Файл экспорта отправлен.")
 
 
 @router.callback_query(F.data == "item_add")

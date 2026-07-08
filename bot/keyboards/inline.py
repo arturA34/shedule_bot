@@ -51,31 +51,23 @@ def get_skip_subgroups_keyboard() -> InlineKeyboardMarkup:
 
 def get_today_schedule_keyboard() -> InlineKeyboardMarkup:
     """Возвращает инлайн-кнопки под сообщением расписания на сегодня."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="📆 Завтра", callback_data="menu:tomorrow"),
-                InlineKeyboardButton(text="📋 Неделя", callback_data="menu:week"),
-            ],
-            [
-                InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"),
-            ]
-        ]
+    return get_student_period_keyboard(
+        primary_buttons=[
+            InlineKeyboardButton(text="📆 Завтра", callback_data="menu:tomorrow"),
+            InlineKeyboardButton(text="📋 Неделя", callback_data="menu:week"),
+        ],
+        export_callback="export:student:day:today",
     )
 
 
 def get_tomorrow_schedule_keyboard() -> InlineKeyboardMarkup:
     """Возвращает инлайн-кнопки под сообщением расписания на завтра."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="📅 Сегодня", callback_data="menu:today"),
-                InlineKeyboardButton(text="📋 Неделя", callback_data="menu:week"),
-            ],
-            [
-                InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"),
-            ]
-        ]
+    return get_student_period_keyboard(
+        primary_buttons=[
+            InlineKeyboardButton(text="📅 Сегодня", callback_data="menu:today"),
+            InlineKeyboardButton(text="📋 Неделя", callback_data="menu:week"),
+        ],
+        export_callback="export:student:day:tomorrow",
     )
 
 
@@ -107,6 +99,7 @@ def get_tomorrow_holiday_keyboard() -> InlineKeyboardMarkup:
 def get_week_navigation_keyboard(
     monday: datetime.date,
     day_index: Optional[int] = None,
+    include_export: bool = False,
 ) -> InlineKeyboardMarkup:
     """Клавиатура навигации по неделям и дням."""
     prev_monday = monday - datetime.timedelta(days=7)
@@ -139,6 +132,12 @@ def get_week_navigation_keyboard(
         row3.append(
             InlineKeyboardButton(text="📋 Вся неделя", callback_data=f"week:show:{monday.isoformat()}")
         )
+    if include_export:
+        if day_index is None:
+            export_callback = f"export:student:week:{monday.isoformat()}"
+        else:
+            export_callback = f"export:student:day:{monday.isoformat()}:{day_index}"
+        row3.append(InlineKeyboardButton(text="📤 Экспорт", callback_data=export_callback))
     row3.append(InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"))
     
     return InlineKeyboardMarkup(inline_keyboard=[row1, row2, row3])
@@ -181,30 +180,24 @@ def get_teacher_card_keyboard(teacher_id: int, monday_str: str) -> InlineKeyboar
 
 
 def get_teacher_today_keyboard(teacher_id: int, monday_str: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="📆 Завтра", callback_data=f"t_sch:tomorrow:{teacher_id}"),
-                InlineKeyboardButton(text="📋 Неделя", callback_data=f"t_sch:week:show:{teacher_id}:{monday_str}"),
-            ],
-            [
-                InlineKeyboardButton(text="🔙 Назад", callback_data=f"t_sch:card:{teacher_id}"),
-            ]
-        ]
+    return get_teacher_period_keyboard(
+        teacher_id=teacher_id,
+        primary_buttons=[
+            InlineKeyboardButton(text="📆 Завтра", callback_data=f"t_sch:tomorrow:{teacher_id}"),
+            InlineKeyboardButton(text="📋 Неделя", callback_data=f"t_sch:week:show:{teacher_id}:{monday_str}"),
+        ],
+        export_callback=f"export:teacher:day:{teacher_id}:today",
     )
 
 
 def get_teacher_tomorrow_keyboard(teacher_id: int, monday_str: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="📅 Сегодня", callback_data=f"t_sch:today:{teacher_id}"),
-                InlineKeyboardButton(text="📋 Неделя", callback_data=f"t_sch:week:show:{teacher_id}:{monday_str}"),
-            ],
-            [
-                InlineKeyboardButton(text="🔙 Назад", callback_data=f"t_sch:card:{teacher_id}"),
-            ]
-        ]
+    return get_teacher_period_keyboard(
+        teacher_id=teacher_id,
+        primary_buttons=[
+            InlineKeyboardButton(text="📅 Сегодня", callback_data=f"t_sch:today:{teacher_id}"),
+            InlineKeyboardButton(text="📋 Неделя", callback_data=f"t_sch:week:show:{teacher_id}:{monday_str}"),
+        ],
+        export_callback=f"export:teacher:day:{teacher_id}:tomorrow",
     )
 
 
@@ -212,6 +205,7 @@ def get_teacher_week_navigation_keyboard(
     teacher_id: int,
     monday: datetime.date,
     day_index: Optional[int] = None,
+    include_export: bool = False,
 ) -> InlineKeyboardMarkup:
     prev_monday = monday - datetime.timedelta(days=7)
     next_monday = monday + datetime.timedelta(days=7)
@@ -243,9 +237,46 @@ def get_teacher_week_navigation_keyboard(
         row3.append(
             InlineKeyboardButton(text="📋 Вся неделя", callback_data=f"t_sch:week:show:{teacher_id}:{monday.isoformat()}")
         )
+    if include_export:
+        if day_index is None:
+            export_callback = f"export:teacher:week:{teacher_id}:{monday.isoformat()}"
+        else:
+            export_callback = f"export:teacher:day:{teacher_id}:{monday.isoformat()}:{day_index}"
+        row3.append(InlineKeyboardButton(text="📤 Экспорт", callback_data=export_callback))
     row3.append(InlineKeyboardButton(text="🔙 Назад", callback_data=f"t_sch:card:{teacher_id}"))
     
     return InlineKeyboardMarkup(inline_keyboard=[row1, row2, row3])
+
+
+def get_student_period_keyboard(
+    primary_buttons: list[InlineKeyboardButton],
+    export_callback: Optional[str] = None,
+) -> InlineKeyboardMarkup:
+    keyboard_rows = [primary_buttons]
+    if export_callback:
+        keyboard_rows.append([
+            InlineKeyboardButton(text="📤 Экспорт", callback_data=export_callback),
+        ])
+    keyboard_rows.append([
+        InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"),
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+
+
+def get_teacher_period_keyboard(
+    teacher_id: int,
+    primary_buttons: list[InlineKeyboardButton],
+    export_callback: Optional[str] = None,
+) -> InlineKeyboardMarkup:
+    keyboard_rows = [primary_buttons]
+    if export_callback:
+        keyboard_rows.append([
+            InlineKeyboardButton(text="📤 Экспорт", callback_data=export_callback),
+        ])
+    keyboard_rows.append([
+        InlineKeyboardButton(text="🔙 Назад", callback_data=f"t_sch:card:{teacher_id}"),
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
 
 
 # --- Классы CallbackData для Админ-Панели ---
