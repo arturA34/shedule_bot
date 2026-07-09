@@ -13,6 +13,7 @@ _pool: Optional[asyncpg.Pool] = None
 
 
 async def get_pool() -> asyncpg.Pool:
+    """Возвращает пул соединений с БД."""
     global _pool
     if _pool is None:
         settings = get_settings()
@@ -21,6 +22,7 @@ async def get_pool() -> asyncpg.Pool:
 
 
 async def close_db() -> None:
+    """Закрывает пул соединений с БД."""
     global _pool
     if _pool is not None:
         await _pool.close()
@@ -29,11 +31,13 @@ async def close_db() -> None:
 
 
 async def get_connection() -> asyncpg.Connection:
+    """Возвращает одно соединение с БД."""
     settings = get_settings()
     return await asyncpg.connect(settings.db_dsn)
 
 
 async def init_db() -> None:
+    """Инициализирует схему БД и заполняет начальными данными."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute("""
@@ -70,6 +74,7 @@ async def init_db() -> None:
                 ON schedule(group_name);
             CREATE INDEX IF NOT EXISTS idx_schedule_date
                 ON schedule(date);
+
             CREATE TABLE IF NOT EXISTS admin_invites (
                 token VARCHAR(255) PRIMARY KEY,
                 is_used BOOLEAN DEFAULT FALSE
@@ -78,9 +83,20 @@ async def init_db() -> None:
             CREATE TABLE IF NOT EXISTS admins (
                 telegram_id BIGINT PRIMARY KEY
             );
+
+            CREATE TABLE IF NOT EXISTS user_links (
+                id SERIAL PRIMARY KEY,
+                telegram_id BIGINT NOT NULL,
+                title TEXT NOT NULL,
+                url TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_user_links_telegram_id
+                ON user_links(telegram_id);
         """)
-        
-        # Check if teachers table is empty and seed if needed
+
+        # Заполняем преподавателей, если таблица пуста
         count = await conn.fetchval("SELECT COUNT(*) FROM teachers")
         if count == 0:
             await conn.executemany(
@@ -100,12 +116,11 @@ async def init_db() -> None:
             )
             logger.info("Teachers table seeded with default records.")
 
-        # Check if schedule table is empty and seed mock data if needed
+        # Заполняем расписание, если таблица пуста
         schedule_count = await conn.fetchval("SELECT COUNT(*) FROM schedule")
         if schedule_count == 0:
             groups = ["РИ-150943", "РИ-150942"]
             schedule_template = [
-                # Monday
                 {
                     "day_of_week": "Понедельник",
                     "lessons": [
@@ -114,7 +129,6 @@ async def init_db() -> None:
                         {"lesson_number": 3, "start_time": "11:50", "end_time": "13:20", "subject": "Физика", "teacher": "Сидоров С.С.", "room": "210", "building": "Корпус Б", "lesson_type": "Лабораторная", "subgroup_name": "ЛБ-04"},
                     ],
                 },
-                # Tuesday
                 {
                     "day_of_week": "Вторник",
                     "lessons": [
@@ -122,12 +136,10 @@ async def init_db() -> None:
                         {"lesson_number": 2, "start_time": "10:10", "end_time": "11:40", "subject": "Математика", "teacher": "Иванов И.И.", "room": "301", "building": "Главный", "lesson_type": "Практика"},
                     ],
                 },
-                # Wednesday — empty day (no lessons)
                 {
                     "day_of_week": "Среда",
                     "lessons": [],
                 },
-                # Thursday
                 {
                     "day_of_week": "Четверг",
                     "lessons": [
@@ -137,7 +149,6 @@ async def init_db() -> None:
                         {"lesson_number": 4, "start_time": "13:30", "end_time": "15:00", "subject": "Английский язык", "teacher": "Смирнова О.Л.", "room": "108", "building": "Корпус В", "lesson_type": "Практика", "subgroup_name": "ЛБ-02"},
                     ],
                 },
-                # Friday
                 {
                     "day_of_week": "Пятница",
                     "lessons": [
@@ -187,6 +198,7 @@ async def init_db() -> None:
 
 
 async def get_user(telegram_id: int) -> Optional[dict]:
+    """Получить пользователя по telegram_id."""
     pool = await get_pool()
     row = await pool.fetchrow(
         "SELECT telegram_id, primary_group, subgroups FROM users WHERE telegram_id = $1",
@@ -211,6 +223,7 @@ async def get_user(telegram_id: int) -> Optional[dict]:
 
 
 async def create_user(telegram_id: int, primary_group: str, subgroups: list[dict]) -> None:
+    """Создать или обновить пользователя."""
     pool = await get_pool()
     subgroups_json = json.dumps(subgroups, ensure_ascii=False)
     await pool.execute(
@@ -228,6 +241,7 @@ async def create_user(telegram_id: int, primary_group: str, subgroups: list[dict
 
 
 async def update_user(telegram_id: int, primary_group: str, subgroups: list[dict]) -> None:
+    """Обновить данные пользователя."""
     pool = await get_pool()
     subgroups_json = json.dumps(subgroups, ensure_ascii=False)
     await pool.execute(
@@ -239,12 +253,14 @@ async def update_user(telegram_id: int, primary_group: str, subgroups: list[dict
 
 
 async def get_all_groups() -> list[str]:
+    """Получить список всех групп из расписания."""
     pool = await get_pool()
     rows = await pool.fetch("SELECT DISTINCT group_name FROM schedule ORDER BY group_name")
     return [row["group_name"] for row in rows]
 
 
 async def get_lessons_by_group_and_date(group_name: str, date_str: str) -> list[dict]:
+    """Получить занятия группы на указанную дату."""
     pool = await get_pool()
     rows = await pool.fetch(
         """
@@ -262,6 +278,7 @@ async def get_lessons_by_group_and_date(group_name: str, date_str: str) -> list[
 
 
 async def get_lesson_by_id(lesson_id: int) -> Optional[dict]:
+    """Получить занятие по ID."""
     pool = await get_pool()
     row = await pool.fetchrow(
         """
@@ -288,6 +305,7 @@ async def create_lesson(
     group_name: str,
     subgroup_name: Optional[str]
 ) -> None:
+    """Создать новое занятие."""
     pool = await get_pool()
     await pool.execute(
         """
@@ -313,6 +331,7 @@ async def create_lesson(
 
 
 async def update_lesson_subject(lesson_id: int, subject: str) -> None:
+    """Обновить название предмета у занятия."""
     pool = await get_pool()
     await pool.execute(
         "UPDATE schedule SET subject = $1 WHERE id = $2",
@@ -322,6 +341,7 @@ async def update_lesson_subject(lesson_id: int, subject: str) -> None:
 
 
 async def update_lesson_room_building(lesson_id: int, room: str, building: str) -> None:
+    """Обновить аудиторию и корпус у занятия."""
     pool = await get_pool()
     await pool.execute(
         "UPDATE schedule SET room = $1, building = $2 WHERE id = $3",
@@ -332,6 +352,7 @@ async def update_lesson_room_building(lesson_id: int, room: str, building: str) 
 
 
 async def update_lesson_teacher(lesson_id: int, teacher: str) -> None:
+    """Обновить преподавателя у занятия."""
     pool = await get_pool()
     await pool.execute(
         "UPDATE schedule SET teacher = $1 WHERE id = $2",
@@ -341,6 +362,7 @@ async def update_lesson_teacher(lesson_id: int, teacher: str) -> None:
 
 
 async def delete_lesson(lesson_id: int) -> None:
+    """Удалить занятие."""
     pool = await get_pool()
     await pool.execute(
         "DELETE FROM schedule WHERE id = $1",
@@ -349,6 +371,7 @@ async def delete_lesson(lesson_id: int) -> None:
 
 
 async def search_teachers(query: str) -> list[dict]:
+    """Поиск преподавателей по ФИО."""
     pool = await get_pool()
     rows = await pool.fetch(
         "SELECT id, fio, department, email FROM teachers WHERE fio ILIKE $1 ORDER BY fio",
@@ -358,6 +381,7 @@ async def search_teachers(query: str) -> list[dict]:
 
 
 async def get_teacher_by_id(teacher_id: int) -> Optional[dict]:
+    """Получить преподавателя по ID."""
     pool = await get_pool()
     row = await pool.fetchrow(
         "SELECT id, fio, department, email FROM teachers WHERE id = $1",
@@ -367,6 +391,7 @@ async def get_teacher_by_id(teacher_id: int) -> Optional[dict]:
 
 
 async def get_lessons_by_teacher_and_date(teacher_fio: str, date_str: str) -> list[dict]:
+    """Получить занятия преподавателя на указанную дату."""
     pool = await get_pool()
     rows = await pool.fetch(
         """
@@ -386,6 +411,7 @@ async def get_lessons_by_teacher_and_date(teacher_fio: str, date_str: str) -> li
 async def get_lessons_by_teacher_and_date_range(
     teacher_fio: str, start_date_str: str, end_date_str: str
 ) -> list[dict]:
+    """Получить занятия преподавателя за период."""
     pool = await get_pool()
     rows = await pool.fetch(
         """
@@ -404,6 +430,7 @@ async def get_lessons_by_teacher_and_date_range(
 
 
 async def add_admin_invite(token: str) -> None:
+    """Добавить инвайт-токен для администратора."""
     pool = await get_pool()
     await pool.execute(
         "INSERT INTO admin_invites (token, is_used) VALUES ($1, FALSE)",
@@ -412,6 +439,7 @@ async def add_admin_invite(token: str) -> None:
 
 
 async def verify_and_claim_invite(token: str, telegram_id: int) -> bool:
+    """Проверить и активировать инвайт-токен."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
@@ -434,6 +462,7 @@ async def verify_and_claim_invite(token: str, telegram_id: int) -> bool:
 
 
 async def is_admin(telegram_id: int) -> bool:
+    """Проверить, является ли пользователь администратором."""
     pool = await get_pool()
     val = await pool.fetchval(
         "SELECT EXISTS(SELECT 1 FROM admins WHERE telegram_id = $1)",
@@ -442,5 +471,55 @@ async def is_admin(telegram_id: int) -> bool:
     return bool(val)
 
 
+async def get_user_links(telegram_id: int) -> list[dict]:
+    """Получить все ссылки пользователя."""
+    pool = await get_pool()
+    rows = await pool.fetch(
+        "SELECT id, title, url FROM user_links WHERE telegram_id = $1 ORDER BY id",
+        telegram_id,
+    )
+    return [{"id": row["id"], "title": row["title"], "url": row["url"]} for row in rows]
 
 
+async def add_user_link(telegram_id: int, title: str, url: str) -> None:
+    """Добавить ссылку пользователю."""
+    pool = await get_pool()
+    await pool.execute(
+        "INSERT INTO user_links (telegram_id, title, url) VALUES ($1, $2, $3)",
+        telegram_id,
+        title.strip(),
+        url.strip(),
+    )
+
+
+async def delete_user_link(telegram_id: int, link_id: int) -> bool:
+    """Удалить ссылку по ID."""
+    pool = await get_pool()
+    result = await pool.execute(
+        "DELETE FROM user_links WHERE id = $1 AND telegram_id = $2",
+        link_id,
+        telegram_id,
+    )
+    return result != "DELETE 0"
+
+
+async def get_user_link_by_url(telegram_id: int, url: str) -> Optional[dict]:
+    """Проверить существование ссылки с таким URL."""
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, title, url FROM user_links WHERE telegram_id = $1 AND url = $2",
+        telegram_id,
+        url,
+    )
+    return dict(row) if row else None
+
+
+async def get_user_link_by_title(telegram_id: int, title: str) -> Optional[dict]:
+    """Проверить существование ссылки с таким названием."""
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, title, url FROM user_links WHERE telegram_id = $1 AND title = $2",
+        telegram_id,
+        title,
+    )
+    return dict(row) if row else None

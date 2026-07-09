@@ -15,7 +15,10 @@ start_router = Router(name="start")
 
 @start_router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, command: CommandObject) -> None:
+    """Обработчик команды /start."""
     args = command.args
+    
+    # Проверка на инвайт для администратора
     if args and args.startswith("admin_"):
         token = args.replace("admin_", "", 1)
         success = await verify_and_claim_invite(token, message.from_user.id)
@@ -31,6 +34,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
 
     user = await get_user(message.from_user.id)
 
+    # Если пользователь уже зарегистрирован
     if user:
         await message.answer(
             f"С возвращением, {message.from_user.full_name}! 👋\n\n"
@@ -40,6 +44,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
         )
         return
 
+    # Начинаем регистрацию нового пользователя
     await state.set_state(RegistrationStates.WaitingForGroup)
     sent_msg = await message.answer(
         f"Привет, {message.from_user.full_name}! 🎓\n\n"
@@ -52,10 +57,11 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
 
 @start_router.message(RegistrationStates.WaitingForGroup)
 async def process_group(message: Message, state: FSMContext) -> None:
+    """Обработка ввода группы при регистрации."""
     group = message.text.strip()
     await state.update_data(primary_group=group, subgroups=[])
     
-    # Delete the user's input message to keep chat clean
+    # Удаляем сообщение пользователя
     try:
         await message.delete()
     except Exception:
@@ -64,39 +70,40 @@ async def process_group(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     last_msg_id = data.get("last_msg_id")
 
+    # Удаляем предыдущее сообщение бота
     if last_msg_id:
         try:
             await message.bot.delete_message(chat_id=message.chat.id, message_id=last_msg_id)
         except Exception:
             pass
-    # Clear last_msg_id so update_subgroups_message generates a new one
-    await state.update_data(last_msg_id=None)
 
+    await state.update_data(last_msg_id=None)
     await state.set_state(RegistrationStates.WaitingForSubgroups)
     await update_subgroups_message(message, state, group, [], is_registration=True)
 
 
 @start_router.message(RegistrationStates.WaitingForSubgroups)
 async def process_subgroups(message: Message, state: FSMContext) -> None:
+    """Обработка ввода подгрупп при регистрации."""
     data = await state.get_data()
     primary_group = data["primary_group"]
     subgroups = data.get("subgroups", [])
     text = message.text.strip()
 
-    # Delete the user's input message to keep chat clean
+    # Удаляем сообщение пользователя
     try:
         await message.delete()
     except Exception:
         pass
 
-    # Check if the user is finished
+    # Завершение ввода подгрупп
     if text.lower() in ("нет", "⏭️ без подгрупп", "✅ готово"):
-        # Save user in DB
         await create_user(message.from_user.id, primary_group, subgroups)
         
         last_msg_id = data.get("last_msg_id")
         await state.clear()
 
+        # Удаляем последнее сообщение бота
         if last_msg_id:
             try:
                 await message.bot.delete_message(chat_id=message.chat.id, message_id=last_msg_id)
@@ -118,7 +125,7 @@ async def process_subgroups(message: Message, state: FSMContext) -> None:
         await message.answer(success_text, reply_markup=get_main_menu_keyboard())
         return
 
-    # Parse subgroup
+    # Парсим ввод подгруппы
     parsed = parse_subgroup_input(text)
     if not parsed:
         error_text = "Неверный формат. Пожалуйста, введите в формате: Предмет Подгруппа (например: Физика ЛБ-04)"
@@ -129,7 +136,7 @@ async def process_subgroups(message: Message, state: FSMContext) -> None:
 
     subject, subgroup = parsed
     
-    # Replace subgroup if the subject already exists, to avoid duplicates
+    # Обновляем или добавляем подгруппу
     updated = False
     for s in subgroups:
         if s["subject"].lower() == subject.lower():
