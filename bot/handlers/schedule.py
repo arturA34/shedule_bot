@@ -4,9 +4,17 @@ from typing import Optional
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
 from bot.keyboards import get_week_navigation_keyboard
+from bot.keyboards.inline import (
+    get_today_schedule_keyboard,
+    get_tomorrow_schedule_keyboard,
+)
+from bot.services.export_service import (
+    build_safe_filename,
+    build_schedule_xlsx,
+)
 from bot.services.schedule_service import (
     UserNotRegisteredError,
     get_user_schedule,
@@ -30,6 +38,11 @@ def pluralize_lessons(n: int) -> str:
         return f"{n} пары"
     else:
         return f"{n} пар"
+
+
+def _today_monday() -> datetime.date:
+    today = datetime.date.today()
+    return today - datetime.timedelta(days=today.weekday())
 
 
 async def show_today_schedule(
@@ -62,6 +75,7 @@ async def show_today_schedule(
     if lessons:
         header = f"📅 Расписание на сегодня ({today.strftime('%d.%m.%Y')}):"
         text = format_lessons_student(lessons, header)
+        keyboard = get_today_schedule_keyboard()
     else:
         # Check if schedule data exists for today
         if not await has_schedule_data_for_date(today):
@@ -70,6 +84,7 @@ async def show_today_schedule(
                 f"⚠️ Расписание на этот период ещё не загружено.\n\n"
                 f"Пожалуйста, обратитесь к администратору или попробуйте позже."
             )
+            keyboard = None
         else:
             # Holiday today
             try:
@@ -85,15 +100,16 @@ async def show_today_schedule(
                 f"😴 Пар нет. Можете отдохнуть или подготовиться к следующим занятиям.\n\n"
                 f"Завтра ({tomorrow_date_str}) у вас запланировано {lessons_word}."
             )
+            keyboard = None
 
     if message_to_edit:
         try:
-            await message_to_edit.edit_text(text, reply_markup=None)
+            await message_to_edit.edit_text(text, reply_markup=keyboard)
             return
         except Exception:
             pass
 
-    await (message_to_reply or message_to_edit).answer(text, reply_markup=None)
+    await (message_to_reply or message_to_edit).answer(text, reply_markup=keyboard)
 
 
 async def show_tomorrow_schedule(
@@ -126,6 +142,7 @@ async def show_tomorrow_schedule(
     if lessons:
         header = f"📅 Расписание на завтра ({tomorrow.strftime('%d.%m.%Y')}):"
         text = format_lessons_student(lessons, header)
+        keyboard = get_tomorrow_schedule_keyboard()
     else:
         # Check if schedule data exists for tomorrow
         if not await has_schedule_data_for_date(tomorrow):
@@ -134,6 +151,7 @@ async def show_tomorrow_schedule(
                 f"⚠️ Расписание на этот период ещё не загружено.\n\n"
                 f"Пожалуйста, обратитесь к администратору или попробуйте позже."
             )
+            keyboard = None
         else:
             # Holiday tomorrow
             try:
@@ -149,15 +167,16 @@ async def show_tomorrow_schedule(
                 f"😴 Завтра пар нет. Хорошего выходного!\n\n"
                 f"Сегодня ({today_date_str}) у вас было {lessons_word}."
             )
+            keyboard = None
 
     if message_to_edit:
         try:
-            await message_to_edit.edit_text(text, reply_markup=None)
+            await message_to_edit.edit_text(text, reply_markup=keyboard)
             return
         except Exception:
             pass
 
-    await (message_to_reply or message_to_edit).answer(text, reply_markup=None)
+    await (message_to_reply or message_to_edit).answer(text, reply_markup=keyboard)
 
 
 async def show_week_schedule(
@@ -185,12 +204,14 @@ async def show_week_schedule(
         await state.update_data(last_msg_id=sent_msg.message_id)
         return
 
+    has_week_lessons = any(week_schedule.get((monday + datetime.timedelta(days=offset)).isoformat()) for offset in range(7))
+
     if day_index is None:
         # Compact week view
         sunday = monday + datetime.timedelta(days=6)
         header = f"📋 Расписание на неделю ({monday.strftime('%d.%m')}–{sunday.strftime('%d.%m')}.{monday.year}):"
         text = format_week_schedule_student(monday, week_schedule, header)
-        keyboard = get_week_navigation_keyboard(monday, None)
+        keyboard = get_week_navigation_keyboard(monday, None, include_export=has_week_lessons)
     else:
         # Detailed day view
         day = monday + datetime.timedelta(days=day_index)
@@ -208,7 +229,7 @@ async def show_week_schedule(
             else:
                 text = f"{header}\n\n😴 Пар нет"
                 
-        keyboard = get_week_navigation_keyboard(monday, day_index)
+        keyboard = get_week_navigation_keyboard(monday, day_index, include_export=bool(lessons))
 
     if message_to_edit:
         try:
@@ -245,13 +266,11 @@ async def cmd_tomorrow(message: Message, state: FSMContext) -> None:
 @schedule_router.message(Command("week"))
 @schedule_router.message(F.text == "📋 Расписание на неделю")
 async def cmd_week(message: Message, state: FSMContext) -> None:
-    today = datetime.date.today()
-    monday = today - datetime.timedelta(days=today.weekday())
     await show_week_schedule(
         chat_id=message.chat.id,
         user_id=message.from_user.id,
         state=state,
-        monday=monday,
+        monday=_today_monday(),
         day_index=None,
         message_to_reply=message,
     )
@@ -281,13 +300,11 @@ async def cb_tomorrow(callback: CallbackQuery, state: FSMContext) -> None:
 
 @schedule_router.callback_query(F.data == "menu:week")
 async def cb_week(callback: CallbackQuery, state: FSMContext) -> None:
-    today = datetime.date.today()
-    monday = today - datetime.timedelta(days=today.weekday())
     await show_week_schedule(
         chat_id=callback.message.chat.id,
         user_id=callback.from_user.id,
         state=state,
-        monday=monday,
+        monday=_today_monday(),
         day_index=None,
         message_to_edit=callback.message,
     )
@@ -317,3 +334,49 @@ async def cb_week_navigation(callback: CallbackQuery, state: FSMContext) -> None
         message_to_edit=callback.message,
     )
     await callback.answer()
+
+
+@schedule_router.callback_query(F.data.startswith("export:student:"))
+async def cb_export_student_schedule(callback: CallbackQuery, state: FSMContext) -> None:
+    parts = callback.data.split(":")
+    export_kind = parts[2]
+
+    if export_kind == "week":
+        monday = datetime.date.fromisoformat(parts[3])
+        sunday = monday + datetime.timedelta(days=6)
+        lessons_map = await get_user_schedule_range(
+            callback.from_user.id,
+            monday,
+            sunday,
+        )
+        lessons = [
+            lesson
+            for offset in range(7)
+            for lesson in lessons_map.get((monday + datetime.timedelta(days=offset)).isoformat(), [])
+        ]
+        filename = build_safe_filename(
+            f"Расписание_неделя_{monday.strftime('%d.%m.%Y')}-{sunday.strftime('%d.%m.%Y')}",
+            "xlsx",
+        )
+    else:
+        if parts[3] == "today":
+            target_date = datetime.date.today()
+        elif parts[3] == "tomorrow":
+            target_date = datetime.date.today() + datetime.timedelta(days=1)
+        else:
+            monday = datetime.date.fromisoformat(parts[3])
+            target_date = monday + datetime.timedelta(days=int(parts[4]))
+
+        lessons = await get_user_schedule(callback.from_user.id, target_date)
+        filename = build_safe_filename(f"Расписание_{target_date.strftime('%d.%m.%Y')}", "xlsx")
+
+    if not lessons:
+        await callback.answer("Для экспорта нет занятий.", show_alert=True)
+        return
+
+    document = BufferedInputFile(
+        build_schedule_xlsx(lessons, sheet_title="Расписание", view="student"),
+        filename=filename,
+    )
+    await callback.message.answer_document(document, caption="Экспорт расписания (Excel)")
+    await callback.answer("Файл экспорта отправлен.")

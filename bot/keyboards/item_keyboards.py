@@ -149,6 +149,9 @@ def get_all_items_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
+                InlineKeyboardButton(text="📤 Экспорт", callback_data="item_export_all"),
+            ],
+            [
                 InlineKeyboardButton(text="🔙 Назад", callback_data="item_back"),
             ]
         ]
