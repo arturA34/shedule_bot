@@ -8,8 +8,10 @@ from bot.handlers.help import help_router
 from bot.handlers.change_group import change_group_router
 from bot.handlers.teacher_search import teacher_search_router
 from bot.handlers.item_handlers import router as items_router
+from bot.handlers.links import links_router
 
 all_routers = [
+    links_router,
     start_router,
     menu_router,
     schedule_router,
@@ -21,4 +23,3 @@ all_routers = [
 ]
 
 __all__ = ["all_routers"]
-

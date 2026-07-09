@@ -11,6 +11,11 @@ from bot.keyboards.reply import (
     get_teacher_search_retry_keyboard,
     get_teacher_card_keyboard,
 )
+from bot.keyboards.links_keyboards import (
+    get_links_main_keyboard,
+    get_links_delete_keyboard,
+    get_cancel_keyboard as get_links_cancel_keyboard,
+)
 
 __all__ = [
     "get_week_navigation_keyboard",
@@ -22,4 +27,7 @@ __all__ = [
     "get_teacher_search_cancel_keyboard",
     "get_teacher_search_retry_keyboard",
     "get_teacher_card_keyboard",
+    "get_links_main_keyboard",
+    "get_links_delete_keyboard",
+    "get_links_cancel_keyboard",
 ]

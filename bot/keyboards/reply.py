@@ -2,7 +2,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 
 def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
-    """Возвращает главное меню в виде Reply-клавиатуры."""
+    """Главное меню бота."""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -11,9 +11,10 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="📋 Расписание на неделю"),
+                KeyboardButton(text="👨‍🏫 Поиск по преподавателю"),
             ],
             [
-                KeyboardButton(text="👨‍🏫 Поиск по преподавателю"),
+                KeyboardButton(text="🔗 Полезные ссылки"),
                 KeyboardButton(text="❓ Помощь"),
             ],
             [
@@ -26,7 +27,7 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
 
 
 def get_skip_subgroups_keyboard() -> ReplyKeyboardMarkup:
-    """Возвращает Reply-клавиатуру для пропуска ввода подгрупп."""
+    """Клавиатура для пропуска ввода подгрупп."""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -38,7 +39,7 @@ def get_skip_subgroups_keyboard() -> ReplyKeyboardMarkup:
 
 
 def get_done_subgroups_keyboard() -> ReplyKeyboardMarkup:
-    """Возвращает Reply-клавиатуру для завершения ввода подгрупп."""
+    """Клавиатура для завершения ввода подгрупп."""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -49,9 +50,8 @@ def get_done_subgroups_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-
 def get_cancel_keyboard() -> ReplyKeyboardMarkup:
-    """Возвращает Reply-клавиатуру для отмены действия."""
+    """Клавиатура для отмены действия."""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -63,12 +63,12 @@ def get_cancel_keyboard() -> ReplyKeyboardMarkup:
 
 
 def get_teacher_search_cancel_keyboard() -> ReplyKeyboardMarkup:
-    """Возвращает Reply-клавиатуру для отмены поиска преподавателя."""
+    """Клавиатура для отмены поиска преподавателя."""
     return get_cancel_keyboard()
 
 
 def get_teacher_search_retry_keyboard() -> ReplyKeyboardMarkup:
-    """Возвращает Reply-клавиатуру для повтора поиска или возврата в меню."""
+    """Клавиатура для повтора поиска или возврата в меню."""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -81,7 +81,7 @@ def get_teacher_search_retry_keyboard() -> ReplyKeyboardMarkup:
 
 
 def get_teacher_card_keyboard() -> ReplyKeyboardMarkup:
-    """Возвращает Reply-клавиатуру управления карточкой преподавателя."""
+    """Клавиатура управления карточкой преподавателя."""
     return ReplyKeyboardMarkup(
         keyboard=[
             [
